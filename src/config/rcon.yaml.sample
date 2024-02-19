@@ -1,0 +1,9 @@
+default:
+  address: "localhost:25575"
+  password: "hoge"
+palworld:
+  address: "localhost:25575"
+  password: "hoge"
+minecraft:
+  address: "localhost:25575"
+  password: "hoge"

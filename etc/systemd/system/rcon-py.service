@@ -1,0 +1,14 @@
+[Unit]
+Description=Discord Bot for RCON
+Wants=palworld.service
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=@@CURDIR@@/venv/bin/python @@CURDIR@@/src/app.py
+Restart=always
+RestartSec=10
+User=@@CUR_USER@@
+
+[Install]
+WantedBy=multi-user.target

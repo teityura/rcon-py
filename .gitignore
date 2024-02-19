@@ -1,0 +1,7 @@
+.git
+.vscode
+venv/
+src/logs/
+src/config/.env
+src/config/rcon.yaml
+etc/cron.d/rcon-py

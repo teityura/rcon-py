@@ -1,0 +1,1 @@
+# 00 7 * * * @@CUR_USER@@ @@CURDIR@@/venv/bin/python @@CURDIR@@/src/hook.py restart 5
