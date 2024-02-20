@@ -4,7 +4,7 @@ gorcon x discord.py bot
 
 ## Overview
 
-This project is a Chatbot for the Palworld dedicated server.
+This project is a Discord Bot for the Palworld dedicated server.
 
 ## Project Structure
 
@@ -62,19 +62,25 @@ Create a virtual environment in ./venv using python venv, and set up the executi
 make venv
 ```
 
-Set up the Cron job.
+Set up the Cron job. This will add the cron job to `/etc/cron.d/rcon-py`.
 
 ```
 make cron
 ```
 
-Set up the RCON tool.
+Set up the RCON tool. This will download the [gorcon/rcon-cli](https://github.com/gorcon/rcon-cli) tool and place it in /usr/local/bin/rcon.
 
 ```
 make rcon
 ```
 
-Start the service.
+Set up the unit file for the systemd service. This will create the necessary files in `/etc/systemd/system/rcon-py`.
+
+```
+make unit
+```
+
+Start the service. This will start the rcon-py service.
 
 ```
 make start
@@ -87,12 +93,14 @@ make start
 
 ## Configs
 
+These environment variables can include settings that depend on the environment in which the application is run, such as database connection information or API keys:
+
 - rcon.yaml: A file containing settings for RCON and the Discord bot.
-- .env: This file is used to set environment variables. These environment variables can include settings that depend on the environment in which the application is run, such as database connection information or API keys.
+- .env: This file is used to set environment variables.
 
-## Cron Job Details
+## Cron Job Sample
 
-The cron job is scheduled to execute the hook.py script with the restart command once every day at 6:55 AM. This ensures that the script runs precisely at the specified time without any intervals.
+The cron job is scheduled to execute the hook.py script with the restart command once every day at 6:55 AM. The script then waits for 300 seconds before initiating a restart, ensuring that the actual restart occurs at 7:00 AM.
 
 ```
 55 6 * * * @@CUR_USER@@ @@CURDIR@@/venv/bin/python @@CURDIR@@/src/hook.py restart 300
@@ -105,3 +113,7 @@ To remove all files and directories created by the Makefile, run the following c
 ```
 make clean
 ```
+
+## References
+
+- gorcon/rcon-cli: [https://github.com/gorcon/rcon-cli](https://github.com/gorcon/rcon-cli)
