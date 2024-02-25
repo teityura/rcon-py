@@ -22,7 +22,7 @@ DEBUG_LOG_PATH = f"{SRC_DIR}/logs/debug-app.log"
 
 # server settings
 BANLIST_PATH = f"{INSTALL_DIR}/Pal/Saved/SaveGames/banlist.txt"
-CONFIG_PATH = f"{STEAM_DIR}/Pal/Saved/Config/LinuxServer/PalWorldSettings.ini"
+CONFIG_PATH = f"{INSTALL_DIR}/Pal/Saved/Config/LinuxServer/PalWorldSettings.ini"
 DEFAULT_CONFIG_PATH = f"{INSTALL_DIR}/DefaultPalWorldSettings.ini"
 
 # backup settings
