@@ -5,6 +5,7 @@ import fileinput
 import logging
 import os
 import subprocess
+import tarfile
 from datetime import datetime
 
 import discord
@@ -13,8 +14,9 @@ from dotenv import load_dotenv
 
 # base directories
 SRC_DIR = os.path.dirname(__file__)
-STEAM_DIR = "/home/steam"
-INSTALL_DIR = f"{STEAM_DIR}/dedicated-server/palworld"
+USER = "steam"
+HOME_DIR = f"/home/{USER}"
+INSTALL_DIR = f"{HOME_DIR}/dedicated-server/palworld"
 
 # logging settings
 LOG_PATH = f"{SRC_DIR}/logs/app.log"
@@ -22,12 +24,13 @@ DEBUG_LOG_PATH = f"{SRC_DIR}/logs/debug-app.log"
 
 # server settings
 BANLIST_PATH = f"{INSTALL_DIR}/Pal/Saved/SaveGames/banlist.txt"
-CONFIG_PATH = f"{STEAM_DIR}/Pal/Saved/Config/LinuxServer/PalWorldSettings.ini"
+CONFIG_PATH = f"{INSTALL_DIR}/Pal/Saved/Config/LinuxServer/PalWorldSettings.ini"
 DEFAULT_CONFIG_PATH = f"{INSTALL_DIR}/DefaultPalWorldSettings.ini"
 
 # backup settings
 SAVE_DIR = f"{INSTALL_DIR}/Pal/Saved"
-BACKUP_DIR = f"{STEAM_DIR}/backup/palworld"
+BACKUP_DIR = f"{HOME_DIR}/backups"
+BACKUP_GAME_DIR = f"{BACKUP_DIR}/palworld"
 BACKUP_BASE_NAME = "backup-palworld"
 MAX_BACKUPS = 120
 
@@ -136,9 +139,9 @@ def is_valid_request():
 
 def run_rcon_command(command, argument=None):
     command_string = command if argument is None else f"{command} {argument}"
-    return subprocess.run([
-        RCON_PATH, "-c", RCON_CONFIG_PATH, "-e", RCON_PROFILE, command_string
-    ], capture_output=True, text=True)
+    return subprocess.run(
+        [RCON_PATH, "-c", RCON_CONFIG_PATH, "-e", RCON_PROFILE, command_string], capture_output=True, text=True
+    )
 
 
 @bot.command(name="info", brief="サーバーの情報を表示します")
@@ -226,30 +229,49 @@ async def unban_player(ctx, steam_id: str):
         await ctx.send(":information_source: banlist.txt が見つかりませんでした(先に /banplayer を実行してください)")
 
 
+def create_backup(version, current_time, uid, gid):
+    BACKUP_PATH = f"{BACKUP_GAME_DIR}/{version}_{BACKUP_BASE_NAME}_{current_time}.tar.gz"
+    with tarfile.open(BACKUP_PATH, "w:gz") as tar:
+        tar.add(SAVE_DIR, arcname=".")
+    os.chown(BACKUP_PATH, uid, gid)
+    return BACKUP_PATH
+
+
+def prune_old_backups():
+    backups = sorted(os.listdir(BACKUP_DIR), reverse=True)
+    old_backups = backups[MAX_BACKUPS:]
+    for backup in old_backups:
+        os.remove(os.path.join(BACKUP_DIR, backup))
+
+
 @bot.command(name="backup", brief="サーバーのバックアップを取得します")
 @is_valid_request()
 async def backup(ctx):
     current_time = datetime.now().strftime("%Y%m%d%H%M%S")
     result = run_rcon_command("Info")
-    # Welcome to Pal Server[v0.1.4.1] Teityura's Palworld Server
+    # Get the server version
     if "Welcome to" in result.stdout:
+        # Welcome to Pal Server[v0.1.4.1] Teityura's Palworld Server
         version = result.stdout.split("[")[1].split("]")[0]
     else:
         version = "vx.x.x.x"
-    # Create backup archive
-    BACKUP_PATH = f"{BACKUP_DIR}/{version}_{BACKUP_BASE_NAME}_{current_time}.tar.gz"
-    subprocess.run(["tar", "czf", BACKUP_PATH, "-C", SAVE_DIR, "."])
-    result = subprocess.run(["ls", "-l", BACKUP_PATH], capture_output=True, text=True)
-    if result.returncode == 0:
+    # Create the backup directory if it does not exist
+    os.makedirs(BACKUP_GAME_DIR, exist_ok=True)
+    # Change the owner of the backup directory
+    stat_info = os.stat(HOME_DIR)
+    uid, gid = stat_info.st_uid, stat_info.st_gid
+    for dir_path in [BACKUP_DIR, BACKUP_GAME_DIR]:
+        os.chown(dir_path, uid, gid)
+    # Create the backup
+    BACKUP_PATH = create_backup(version, current_time, uid, gid)
+    if os.path.exists(BACKUP_PATH):
+        result = subprocess.run(["ls", "-l", BACKUP_PATH], capture_output=True, text=True)
         await ctx.send(f":ok: バックアップ に成功しました\n```{result.stdout}```")
         app_logger.info(f"Backup created: {BACKUP_PATH}")
     else:
         await ctx.send(f":warning: バックアップ に失敗しました\n```stdout: {result.stdout}\nstderr: {result.stderr}```")
     # Prune old backups
-    backups = sorted(os.listdir(BACKUP_DIR), reverse=True)
-    old_backups = backups[MAX_BACKUPS:]
-    for backup in old_backups:
-        os.remove(os.path.join(BACKUP_DIR, backup))
+    prune_old_backups()
 
 
 def truncate_message(msg):
@@ -354,6 +376,9 @@ async def update(ctx, delay: int = 60):
         "Please prepare to exit the game."
     )
     await asyncio.sleep(delay)
+    # バックアップ
+    await ctx.send(":construction: バックアップを取得します...")
+    await backup(ctx)
     # 停止
     await ctx.send(":construction: サーバーを停止しています...")
     result = subprocess.run(["systemctl", "stop", "palworld"], capture_output=True, text=True)
@@ -365,10 +390,11 @@ async def update(ctx, delay: int = 60):
     msg_body = truncate_message(result.stdout)
     await ctx.send(f"{msg_subject}\n```# systemctl status palworld\n{msg_body}```")
     # アップデート
-    await ctx.send(":construction: バックアップを取得します...")
-    await backup(ctx)
     command = [
-        "steamcmd",
+        "sudo",
+        "-u",
+        USER,
+        "/usr/games/steamcmd",
         "+login",
         "anonymous",
         "+force_install_dir",
