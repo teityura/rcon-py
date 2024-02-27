@@ -14,7 +14,8 @@ from dotenv import load_dotenv
 
 # base directories
 SRC_DIR = os.path.dirname(__file__)
-HOME_DIR = "/home/steam"
+USER = "steam"
+HOME_DIR = f"/home/{USER}"
 INSTALL_DIR = f"{HOME_DIR}/dedicated-server/palworld"
 
 # logging settings
@@ -375,6 +376,9 @@ async def update(ctx, delay: int = 60):
         "Please prepare to exit the game."
     )
     await asyncio.sleep(delay)
+    # バックアップ
+    await ctx.send(":construction: バックアップを取得します...")
+    await backup(ctx)
     # 停止
     await ctx.send(":construction: サーバーを停止しています...")
     result = subprocess.run(["systemctl", "stop", "palworld"], capture_output=True, text=True)
@@ -386,10 +390,11 @@ async def update(ctx, delay: int = 60):
     msg_body = truncate_message(result.stdout)
     await ctx.send(f"{msg_subject}\n```# systemctl status palworld\n{msg_body}```")
     # アップデート
-    await ctx.send(":construction: バックアップを取得します...")
-    await backup(ctx)
     command = [
-        "steamcmd",
+        "sudo",
+        "-u",
+        USER,
+        "/usr/games/steamcmd",
         "+login",
         "anonymous",
         "+force_install_dir",
